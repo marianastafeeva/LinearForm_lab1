@@ -3,125 +3,116 @@
 
 #include "tests.h"
 #include "field_info.h"
+#include "linear_form.h"
 
-void menu() {
-    printf("\n=== MENU ===\n");
-    printf("1. Run ALL tests\n");
-    printf("2. Run ONE test\n");
-    printf("3. Add\n");
-    printf("4. Subtract\n");
-    printf("5. Multiply\n");
-    printf("0. Exit\n");
-}
+#define ELEM_RAW(ptr, size, i) ((char*)(ptr) + i*(size))
+
 
 FieldInfo* chooseField() {
-    int type;
-    printf("Choose type: 1 - int, 2 - double: ");
-    scanf("%d", &type);
-
-    if (type == 1) return GetIntFieldInfo();
-    return GetDoubleFieldInfo();
+    int t;
+    printf("1-int 2-double: ");
+    scanf("%d",&t);
+    return (t==1)?GetIntFieldInfo():GetDoubleFieldInfo();
 }
 
-void* inputValue(FieldInfo* field) {
-    void* value = malloc(field->size);
-
-    if (field->size == sizeof(int)) {
-        scanf("%d", (int*)value);
+//записывает число в память
+void inputValue(FieldInfo* f, void* dst) {
+    if (f->size == sizeof(int)) {
+        scanf("%d",(int*)dst);
     } else {
-        scanf("%lf", (double*)value);
+        scanf("%lf",(double*)dst);
     }
-
-    return value;
 }
 
-void printValue(FieldInfo* field, void* value) {
-    if (field->size == sizeof(int)) {
-        printf("%d\n", *(int*)value);
+void printValue(FieldInfo* f, void* v) {
+    if (f->size == sizeof(int)) {
+        printf("%d\n",*(int*)v);
     } else {
-        printf("%lf\n", *(double*)value);
+        printf("%lf\n",*(double*)v);
     }
 }
 
-void runOperation(int op) {
-    FieldInfo* field = chooseField();
+// операции
+void runOp(int op) {
+    FieldInfo* f = chooseField();
 
-    printf("Enter first number: ");
-    void* a = inputValue(field);
+    void* a = malloc(f->size);
+    void* b = malloc(f->size);
+    void* r = malloc(f->size);
 
-    printf("Enter second number: ");
-    void* b = inputValue(field);
+    printf("Enter a: "); inputValue(f,a);
+    printf("Enter b: "); inputValue(f,b);
 
-    void* result = NULL;
+    if(op==1) f->add(a,b,r);
+    if(op==2) f->sub(a,b,r);
+    if(op==3) f->mul(a,b,r);
 
-    if (op == 1) result = field->add(a, b);
-    if (op == 2) result = field->sub(a, b);
-    if (op == 3) result = field->mul(a, b);
+    printf("Result: ");
+    printValue(f,r);
 
-    printf("Result = ");
-    printValue(field, result);
-
-    free(a);
-    free(b);
-    field->free(result);
+    free(a); free(b); free(r);
 }
 
-// запуск одного теста
-void runSingleTest(int t) {
-    printf("Running test %d...\n", t);
+// линейная форма
+void runLinear() {
+    FieldInfo* f = chooseField();
 
-    switch (t) {
-        case 1: TestCreate(); break;
-        case 2: TestSetCoefficient(); break;
-        case 3: TestAdd(); break;
-        case 4: TestMultiply(); break;
-        case 5: TestEvaluate(); break;
-        case 6: TestDifferentSizes(); break;
-        case 7: TestOverwriteCoefficient(); break;
-        case 8: TestDifferentTypes(); break;
-        case 9: TestNullCoefficient(); break;
-        default: printf("No such test\n");
+    int n;
+    printf("size: ");
+    scanf("%d",&n);
+
+    LinearForm* lf = CreateLinearForm(n,f);
+
+    for(int i=0;i<n;i++){
+        printf("a%d: ",i);
+        void* tmp = malloc(f->size);
+        inputValue(f,tmp);
+        SetCoefficient(lf,i,tmp);
+        free(tmp);
     }
+
+    if(n>1){
+        void** args = malloc((n-1)*sizeof(void*));
+
+        for(int i=0;i<n-1;i++){
+            args[i] = malloc(f->size);
+            printf("x%d: ",i+1);
+            inputValue(f,args[i]);
+        }
+
+        void* res = malloc(f->size);
+
+        EvaluateLinearForm(lf,args,res);
+
+        printf("Result: ");
+        printValue(f,res);
+
+        for(int i=0;i<n-1;i++) free(args[i]);
+        free(args);
+        free(res);
+    }
+
+    FreeLinearForm(lf);
+}
+
+void menu() {
+    printf("\n1-tests\n2-add\n3-sub\n4-mul\n5-linear\n0-exit\n");
 }
 
 int main() {
-    int choice;
+    int c;
 
-    while (1) {
+    while(1){
         menu();
-        printf("Choose: ");
-        scanf("%d", &choice);
+        scanf("%d",&c);
 
-        switch (choice) {
-            case 1:
-                RunAllTests();
-                break;
-
-            case 2: {
-                int t;
-                printf("Enter test number (1-9): ");
-                scanf("%d", &t);
-                runSingleTest(t);
-                break;
-            }
-
-            case 3:
-                runOperation(1);
-                break;
-
-            case 4:
-                runOperation(2);
-                break;
-
-            case 5:
-                runOperation(3);
-                break;
-
-            case 0:
-                return 0;
-
-            default:
-                printf("Invalid choice\n");
-        }
+        if(c==1) RunAllTests();
+        if(c==2) runOp(1);
+        if(c==3) runOp(2);
+        if(c==4) runOp(3);
+        if(c==5) runLinear();
+        if(c==0) break;
     }
+
+    return 0;
 }

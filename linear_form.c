@@ -1,75 +1,54 @@
+#include "linear_form.h"
 #include <stdlib.h>
-#include "../include/linear_form.h"
+#include <string.h>
 
-LinearForm* CreateLinearForm(int size, FieldInfo* field){
-    LinearForm* lf = malloc(sizeof(LinearForm)); //создаем массив коэфф
+// макрос для получения i-го элемента
+#define ELEM(lf, i) ((char*)lf->coeffs + i * lf->field->size)
+
+// создание формы
+LinearForm* CreateLinearForm(int size, FieldInfo* field) {
+    LinearForm* lf = malloc(sizeof(LinearForm));
 
     lf->size = size;
     lf->field = field;
+    // выделяем память под все коэффициенты сразу
+    lf->coeffs = calloc(size, field->size);
 
-    lf->coeffs = malloc(size * sizeof(void*));
-
-    for (int i = 0; i < size; i++){
-        lf->coeffs[i] = NULL;
-    }
     return lf;
 }
 
-//установка коэффицента
-void SetCoefficient(LinearForm* lf, int index, void* value){
-    //освобождаем память
-    if (lf->coeffs[index] != NULL){
-        lf->field->free(lf->coeffs[index]);
-    }
-    lf->coeffs[index] = lf->field->copy(value); //копируем значение
+void SetCoefficient(LinearForm* lf, int index, void* value) {
+    // копируем значение в нужную позицию
+    lf->field->copy(value, ELEM(lf, index));
 }
 
-LinearForm* AddLinearForm(LinearForm* a, LinearForm* b){
-    if (a->size != b->size || a->field != b->field){ //проверка типа и размера
-        return NULL;
+void AddLinearForm(LinearForm* a, LinearForm* b, LinearForm* result) {
+    for (int i = 0; i < a->size; i++) {
+        a->field->add(ELEM(a,i), ELEM(b,i), ELEM(result,i));
     }
-
-    LinearForm* result = CreateLinearForm(a->size, a->field);
-//складываем поэлементно
-    for (int i = 0; i < a->size; i++){
-        result->coeffs[i] = a->field->add(a->coeffs[i],b->coeffs[i]);
-    }
-    return result;
 }
 
-LinearForm* MultiplyByScalar(LinearForm* lf, void* scalar){
-    LinearForm* result = CreateLinearForm(lf->size, lf->field);
-
-    for (int i= 0; i < lf->size; i++){
-        result->coeffs[i] = lf->field->mul(lf->coeffs[i], scalar);
-    }
-    return result;
-}
-//вычисление значения
-void* EvaluateLinearForm(LinearForm* lf, void** x){
-    void* result = lf->field->copy(lf->coeffs[0]);
-
-    for (int i = 1; i < lf->size; i++){
-        void* temp = lf->field->mul(lf->coeffs[i], x[i-1]);
-
-        void* new_result = lf->field->add(result, temp);
-
-        lf->field->free(result);
-        lf->field->free(temp);
-
-        result = new_result;
-    }
-    return result;
-}
-
-//освобождаем
-void FreeLinearForm(LinearForm* lf) {
+void MultiplyByScalar(LinearForm* lf, void* scalar, LinearForm* result) {
     for (int i = 0; i < lf->size; i++) {
-        if (lf->coeffs[i] != NULL) {
-            lf->field->free(lf->coeffs[i]);
-        }
+        lf->field->mul(ELEM(lf,i), scalar, ELEM(result,i));
     }
+}
 
+void EvaluateLinearForm(LinearForm* lf, void** x, void* result) {
+    // result = a0
+    lf->field->copy(ELEM(lf,0), result);
+
+    char temp[64]; // временная память
+
+    for (int i = 1; i < lf->size; i++) {
+        // temp = ai * xi
+        lf->field->mul(ELEM(lf,i), x[i-1], temp);
+        // result = result + temp
+        lf->field->add(result, temp, result);
+    }
+}
+
+void FreeLinearForm(LinearForm* lf) {
     free(lf->coeffs);
     free(lf);
 }
