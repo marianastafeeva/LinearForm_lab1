@@ -1,21 +1,30 @@
 #ifndef FIELD_INFO_H
 #define FIELD_INFO_H
 
-#include <stdlib.h>
+#include <stddef.h>
 
-// размер типа и операции над ним
+
+// Все операции записывают результат в заранее выделенную память 'res'
+typedef void (*OpBinary)(const void* a, const void* b, void* res);
+typedef void (*OpUnary)(const void* a, void* res);
+typedef void (*OpCopy)(const void* src, void* dst);
+typedef void (*OpInit)(void* dst);
+
+// Структура, описывающая поведение типа данных
 typedef struct {
-    size_t size;
+    size_t element_size;
 
-// результат записывается в уже выделенную память result
-    void (*add)(void*, void*, void*);
-    void (*sub)(void*, void*, void*);
-    void (*mul)(void*, void*, void*);
+    OpBinary add;
+    OpBinary sub;
+    OpBinary mul;
+    OpCopy copy;
 
-    void (*copy)(void*, void*); // копирование значения
+    OpInit init_zero;
+    OpInit init_one;
+    OpUnary neg;
 } FieldInfo;
 
-FieldInfo* GetIntFieldInfo();
-FieldInfo* GetDoubleFieldInfo();
+FieldInfo* GetIntFieldInfo(void);
+FieldInfo* GetDoubleFieldInfo(void);
 
 #endif
