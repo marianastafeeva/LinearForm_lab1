@@ -1,58 +1,92 @@
 #include "field_info.h"
+#include <stdlib.h>
+#include <stdio.h>
 
-void int_add(void* a, void* b, void* r) {
-    *(int*)r = *(int*)a + *(int*)b;
+
+
+static void int_add(const void* a, const void* b, void* res) {
+    *(int*)res = *(const int*)a + *(const int*)b;
 }
 
-void int_sub(void* a, void* b, void* r) {
-    *(int*)r = *(int*)a - *(int*)b;
+static void int_sub(const void* a, const void* b, void* res) {
+    *(int*)res = *(const int*)a - *(const int*)b;
 }
 
-void int_mul(void* a, void* b, void* r) {
-    *(int*)r = *(int*)a * *(int*)b;
+static void int_mul(const void* a, const void* b, void* res) {
+    *(int*)res = *(const int*)a * *(const int*)b;
 }
 
-void int_copy(void* src, void* dst) {
-    *(int*)dst = *(int*)src;
+static void int_copy(const void* src, void* dst) {
+    *(int*)dst = *(const int*)src;
 }
 
-FieldInfo* GetIntFieldInfo() {
-    static FieldInfo info;
+static void int_init_zero(void* dst) {
+    *(int*)dst = 0;
+}
 
-    info.size = sizeof(int);
-    info.add = int_add;
-    info.sub = int_sub;
-    info.mul = int_mul;
-    info.copy = int_copy;
+static void int_init_one(void* dst) {
+    *(int*)dst = 1;
+}
 
-    return &info;
+static void int_neg(const void* a, void* res) {
+    *(int*)res = -(*(const int*)a);
+}
+
+static FieldInfo IntFieldInfo = {
+        .element_size = sizeof(int),
+        .add = int_add,
+        .sub = int_sub,
+        .mul = int_mul,
+        .copy = int_copy,
+        .init_zero = int_init_zero,
+        .init_one = int_init_one,
+        .neg = int_neg
+};
+
+FieldInfo* GetIntFieldInfo(void) {
+    return &IntFieldInfo;
 }
 
 
-void double_add(void* a, void* b, void* r) {
-    *(double*)r = *(double*)a + *(double*)b;
+static void double_add(const void* a, const void* b, void* res) {
+    *(double*)res = *(const double*)a + *(const double*)b;
 }
 
-void double_sub(void* a, void* b, void* r) {
-    *(double*)r = *(double*)a - *(double*)b;
+static void double_sub(const void* a, const void* b, void* res) {
+    *(double*)res = *(const double*)a - *(const double*)b;
 }
 
-void double_mul(void* a, void* b, void* r) {
-    *(double*)r = *(double*)a * *(double*)b;
+static void double_mul(const void* a, const void* b, void* res) {
+    *(double*)res = *(const double*)a * *(const double*)b;
 }
 
-void double_copy(void* src, void* dst) {
-    *(double*)dst = *(double*)src;
+static void double_copy(const void* src, void* dst) {
+    *(double*)dst = *(const double*)src;
 }
 
-FieldInfo* GetDoubleFieldInfo() {
-    static FieldInfo info;
+static void double_init_zero(void* dst) {
+    *(double*)dst = 0.0;
+}
 
-    info.size = sizeof(double);
-    info.add = double_add;
-    info.sub = double_sub;
-    info.mul = double_mul;
-    info.copy = double_copy;
+static void double_init_one(void* dst) {
+    *(double*)dst = 1.0;
+}
 
-    return &info;
+static void double_neg(const void* a, void* res) {
+    *(double*)res = -(*(const double*)a);
+}
+
+static FieldInfo DoubleFieldInfo = {
+        .element_size = sizeof(double),
+        .add = double_add,
+        .sub = double_sub,
+        .mul = double_mul,
+        .copy = double_copy,
+        .init_zero = double_init_zero,
+        .init_one = double_init_one,
+        .neg = double_neg
+};
+
+FieldInfo* GetDoubleFieldInfo(void) {
+    return &DoubleFieldInfo;
 }
