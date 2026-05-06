@@ -1,118 +1,178 @@
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tests.h"
-#include "field_info.h"
 #include "linear_form.h"
+#include "field_info.h"
+#include "tests.h"
 
-#define ELEM_RAW(ptr, size, i) ((char*)(ptr) + i*(size))
+LinearForm* currentForm = NULL;
+FieldInfo* currentField = NULL;
 
-
-FieldInfo* chooseField() {
-    int t;
-    printf("1-int 2-double: ");
-    scanf("%d",&t);
-    return (t==1)?GetIntFieldInfo():GetDoubleFieldInfo();
-}
-
-//записывает число в память
 void inputValue(FieldInfo* f, void* dst) {
-    if (f->size == sizeof(int)) {
-        scanf("%d",(int*)dst);
-    } else {
-        scanf("%lf",(double*)dst);
-    }
+    if (f->element_size == sizeof(int)) scanf("%d", (int*)dst);
+    else if (f->element_size == sizeof(double)) scanf("%lf", (double*)dst);
 }
 
-void printValue(FieldInfo* f, void* v) {
-    if (f->size == sizeof(int)) {
-        printf("%d\n",*(int*)v);
-    } else {
-        printf("%lf\n",*(double*)v);
-    }
+void printValue(FieldInfo* f, const void* v) {
+    if (f->element_size == sizeof(int)) printf("%d", *(const int*)v);
+    else if (f->element_size == sizeof(double)) printf("%lf", *(const double*)v);
 }
 
-// операции
-void runOp(int op) {
-    FieldInfo* f = chooseField();
-
-    void* a = malloc(f->size);
-    void* b = malloc(f->size);
-    void* r = malloc(f->size);
-
-    printf("Enter a: "); inputValue(f,a);
-    printf("Enter b: "); inputValue(f,b);
-
-    if(op==1) f->add(a,b,r);
-    if(op==2) f->sub(a,b,r);
-    if(op==3) f->mul(a,b,r);
-
-    printf("Result: ");
-    printValue(f,r);
-
-    free(a); free(b); free(r);
-}
-
-// линейная форма
-void runLinear() {
-    FieldInfo* f = chooseField();
-
+void createLinearForm() {
+    if (currentForm) { lf_destroy(currentForm); currentForm = NULL; }
     int n;
-    printf("size: ");
-    scanf("%d",&n);
-
-    LinearForm* lf = CreateLinearForm(n,f);
-
-    for(int i=0;i<n;i++){
-        printf("a%d: ",i);
-        void* tmp = malloc(f->size);
-        inputValue(f,tmp);
-        SetCoefficient(lf,i,tmp);
-        free(tmp);
+    printf("\n--- Create New Linear Form ---\n");
+    printf("Enter size (number of coefficients, including a0): ");
+    if (scanf("%d", &n) != 1 || n <= 0) {
+        printf("Error: Invalid size.\n"); while(getchar() != '\n'); return;
     }
+    currentForm = lf_create(n, currentField);
+    if (!currentForm) { printf("Error: Memory allocation failed.\n"); return; }
 
-    if(n>1){
-        void** args = malloc((n-1)*sizeof(void*));
-
-        for(int i=0;i<n-1;i++){
-            args[i] = malloc(f->size);
-            printf("x%d: ",i+1);
-            inputValue(f,args[i]);
-        }
-
-        void* res = malloc(f->size);
-
-        EvaluateLinearForm(lf,args,res);
-
-        printf("Result: ");
-        printValue(f,res);
-
-        for(int i=0;i<n-1;i++) free(args[i]);
-        free(args);
-        free(res);
+    printf("Enter %d coefficients manually:\n", n);
+    for (int i = 0; i < n; i++) {
+        printf("  a[%d] = ", i);
+        void* ptr = lf_get_coeff_ptr(currentForm, i);
+        inputValue(currentField, ptr);
     }
-
-    FreeLinearForm(lf);
+    printf("Form created.\n");
 }
 
-void menu() {
-    printf("\n1-tests\n2-add\n3-sub\n4-mul\n5-linear\n0-exit\n");
+void showLinearForm() {
+    if (!currentForm) { printf("No form created.\n"); return; }
+    printf("\n--- Current Form ---\nF(x) = ");
+    for (int i = 0; i < currentForm->size; i++) {
+        if (i > 0) printf(" + ");
+        printValue(currentField, lf_get_coeff_ptr(currentForm, i));
+        if (i > 0) printf("*x%d", i);
+    }
+    printf("\n");
+}
+
+void addForms() {
+    if (!currentForm) { printf("Create form first.\n"); return; }
+    int n = currentForm->size;
+    printf("\n--- Add Another Form ---\n");
+    printf("Enter %d coefficients for the SECOND form:\n", n);
+
+    LinearForm* b = lf_create(n, currentField);
+    if (!b) return;
+    for (int i = 0; i < n; i++) {
+        printf("  b[%d] = ", i);
+        inputValue(currentField, lf_get_coeff_ptr(b, i));
+    }
+
+    LinearForm* result = lf_create(n, currentField);
+    if (!result) { lf_destroy(b); return; }
+
+    lf_add(currentForm, b, result);
+
+    printf("\nResult Coefficients: [ ");
+    for (int i = 0; i < n; i++) {
+        printValue(currentField, lf_get_coeff_ptr(result, i));
+        printf(" ");
+    }
+    printf("]\n");
+
+    lf_destroy(b); lf_destroy(result);
+}
+
+void multiplyByScalar() {
+    if (!currentForm) { printf("Create form first.\n"); return; }
+    printf("\n--- Multiply by Scalar ---\n");
+    printf("Enter scalar value: ");
+
+    // Allocate memory for scalar based on type
+    void* scalar = malloc(currentField->element_size);
+    if (!scalar) return;
+    inputValue(currentField, scalar);
+
+    LinearForm* result = lf_create(currentForm->size, currentField);
+    if (!result) { free(scalar); return; }
+
+    lf_mul_scalar(currentForm, scalar, result);
+
+    printf("Result Coefficients: [ ");
+    for (int i = 0; i < currentForm->size; i++) {
+        printValue(currentField, lf_get_coeff_ptr(result, i));
+        printf(" ");
+    }
+    printf("]\n");
+
+    lf_destroy(result);
+    free(scalar);
+}
+
+void evalForm() {
+    if (!currentForm) { printf("No form created.\n"); return; }
+    if (currentForm->size < 2) {
+        printf("Constant form. Value = ");
+        printValue(currentField, lf_get_coeff_ptr(currentForm, 0));
+        printf("\n");
+        return;
+    }
+
+    int numVars = currentForm->size - 1;
+    const void** args = malloc(numVars * sizeof(const void*));
+    double* temps = malloc(numVars * sizeof(double));
+    if (!args || !temps) { free(args); free(temps); return; }
+
+    printf("\n--- Evaluate Form ---\n");
+    printf("Enter %d arguments (x1..x%d):\n", numVars, numVars);
+    for (int i = 0; i < numVars; i++) {
+        printf("  x%d = ", i + 1);
+        if (currentField->element_size == sizeof(int)) {
+            int tmp; scanf("%d", &tmp); temps[i] = (double)tmp;
+        } else {
+            scanf("%lf", &temps[i]);
+        }
+        args[i] = &temps[i];
+    }
+
+    double resultVal;
+    lf_eval(currentForm, args, &resultVal);
+    printf("Result F(x) = %lf\n", resultVal);
+
+    free(args); free(temps);
+}
+
+void printMenu() {
+    printf("\n=================================\n");
+    printf("   LINEAR FORM MANAGER           \n");
+    printf("=================================\n");
+    printf("1. Create new linear form\n");
+    printf("2. Show current form\n");
+    printf("3. Add another form\n");
+    printf("4. Multiply by scalar\n");
+    printf("5. Evaluate form\n");
+    printf("6. Run automated tests (7 tests)\n");
+    printf("0. Exit\n");
+    printf("---------------------------------\n");
+    printf("Choice: ");
 }
 
 int main() {
-    int c;
+    int type;
+    printf("=== Polymorphic Linear Form ===\n");
+    printf("Select type:\n1. Integer (int)\n2. Real (double)\nChoice: ");
+    if (scanf("%d", &type) != 1) return 1;
 
-    while(1){
-        menu();
-        scanf("%d",&c);
+    currentField = (type == 1) ? GetIntFieldInfo() : GetDoubleFieldInfo();
+    printf("Selected: %s\n", (type == 1 ? "int" : "double"));
 
-        if(c==1) RunAllTests();
-        if(c==2) runOp(1);
-        if(c==3) runOp(2);
-        if(c==4) runOp(3);
-        if(c==5) runLinear();
-        if(c==0) break;
+    int choice;
+    while (1) {
+        printMenu();
+        if (scanf("%d", &choice) != 1) { while(getchar() != '\n'); continue; }
+
+        switch (choice) {
+            case 1: createLinearForm(); break;
+            case 2: showLinearForm(); break;
+            case 3: addForms(); break;
+            case 4: multiplyByScalar(); break;
+            case 5: evalForm(); break;
+            case 6: RunAllTests(); break;
+            case 0: if (currentForm) lf_destroy(currentForm); printf("Bye!\n"); return 0;
+            default: printf("Invalid choice.\n");
+        }
     }
-
-    return 0;
 }
